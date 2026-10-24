@@ -31,9 +31,7 @@ export default function SignupPage() {
       options: { data: { shop_name: shop.trim(), phone: cleanPhone(phone) } },
     });
     if (err) {
-      setError(/registered|exists/i.test(err.message) ? t("phone_used") : t("error_generic"));
-      setLoading(false);
-      return;
+      setError(/registered|exists/i.test(err.message) ? t("phone_used") : "Erreur : " + err.message);
     }
     if (!data.session) {
       // La confirmation e-mail est encore active dans Supabase : on tente quand même la connexion
