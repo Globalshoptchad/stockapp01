@@ -15,7 +15,8 @@ export function ProductImage({ p }) {
 }
 
 // Carte produit en grand : photo, nom, « Ce qui est vendu » / « Ce qui reste », bénéfice.
-function ProductCard({ p, href, onClick, onDelete, selected, showMoney = true }) {
+// onQuick : vente rapide (+1) sans passer par l'écran de quantité ; today = vendu aujourd'hui
+function ProductCard({ p, href, onClick, onDelete, onQuick, today = 0, selected, showMoney = true }) {
   const { t } = useLang();
   const [busy, setBusy] = useState(false);
   const left = stockOf(p);
@@ -29,6 +30,11 @@ function ProductCard({ p, href, onClick, onDelete, selected, showMoney = true })
         {isLow(p) && (
           <span className="ptag low">
             <Icon name="alert" size={16} /> {t("low_stock")}
+          </span>
+        )}
+        {onQuick && today > 0 && (
+          <span className="ptoday">
+            {t("sold_today")} <b>{today}</b>
           </span>
         )}
       </div>
@@ -69,6 +75,16 @@ function ProductCard({ p, href, onClick, onDelete, selected, showMoney = true })
         <button type="button" className="pmain" onClick={() => onClick && onClick(p)} disabled={!onClick}>
           {body}
         </button>
+      )}
+      {onQuick && (
+        <div className="pquick">
+          <button type="button" className="quick-other" onClick={() => onClick && onClick(p)}>
+            <Icon name="hand" size={22} /> {t("other_qty")}
+          </button>
+          <button type="button" className="quick-plus" onClick={() => onQuick(p)} disabled={left <= 0}>
+            <Icon name="cart" size={26} /> +1
+          </button>
+        </div>
       )}
       {onDelete && (
         <button type="button" className="pdel" onClick={del} disabled={busy} aria-label={t("delete")}>

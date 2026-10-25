@@ -112,7 +112,7 @@ export default function BilanPage() {
                 <Icon name="trend" size={20} /> {a.profit < 0 ? t("loss") : t("profit")}
               </span>
               <b>{fcfa(Math.abs(a.profit))}</b>
-              {a.revenue > 0 && <small>{a.margin} %</small>}
+              {a.revenue > 0 && <small className="num">{a.margin}{"\u00a0"}%</small>}
             </div>
           </div>
 

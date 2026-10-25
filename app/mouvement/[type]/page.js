@@ -1,5 +1,6 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import Shell from "../../../components/Shell";
 import Icon from "../../../components/Icons";
@@ -9,6 +10,7 @@ import { useLang } from "../../../components/Providers";
 import { useRequireAuth } from "../../../lib/useRequireAuth";
 import { supabase } from "../../../lib/supabaseClient";
 import { cachedProducts, fcfa, fetchProducts, filterProducts, packSize, piecePrice, stockOf } from "../../../lib/products";
+import { startOfToday, timeOf } from "../../../lib/helpers";
 
 // Une seule page pour les deux gestes : "entree" (marchandise reçue) et "vente" (produit vendu)
 export default function MovementPage() {
@@ -26,12 +28,64 @@ export default function MovementPage() {
   const [scan, setScan] = useState(false);
   const [q, setQ] = useState("");
   const [unit, setUnit] = useState("piece"); // "pack" = carton, "piece" = pièce
+  const [today, setToday] = useState({}); // pièces vendues aujourd'hui, par produit
+  const [toast, setToast] = useState(null); // dernière vente rapide (avec bouton Annuler)
+  const toastTimer = useRef(null);
 
   async function load() {
     try {
       setProducts(await fetchProducts());
     } catch {}
     setLoading(false);
+    if (isSale) loadToday();
+  }
+
+  // Ventes d'aujourd'hui (pour afficher « Vendu aujourd'hui » sur chaque produit)
+  async function loadToday() {
+    const { data } = await supabase
+      .from("movements")
+      .select("product_id,quantity")
+      .eq("type", "out")
+      .gte("created_at", startOfToday().toISOString());
+    const map = {};
+    (data || []).forEach((m) => (map[m.product_id] = (map[m.product_id] || 0) + m.quantity));
+    setToday(map);
+  }
+
+  function bump(id, deltaPieces) {
+    setProducts((old) => old.map((x) => (x.id === id ? { ...x, total_out: (Number(x.total_out) || 0) + deltaPieces } : x)));
+    setToday((old) => ({ ...old, [id]: Math.max(0, (old[id] || 0) + deltaPieces) }));
+  }
+
+  // Vente rapide : 1 pièce, enregistrée tout de suite avec la date et l'heure
+  const quickSell = useCallback(async (p) => {
+    if (stockOf(p) < 1) return;
+    bump(p.id, 1);
+    const { data, error: err } = await supabase
+      .from("movements")
+      .insert({ product_id: p.id, type: "out", quantity: 1, unit: "piece" })
+      .select("id,created_at")
+      .single();
+    if (err) {
+      bump(p.id, -1);
+      setError(t("error_generic"));
+      return;
+    }
+    clearTimeout(toastTimer.current);
+    setToast({ id: data.id, product: p, at: data.created_at, amount: piecePrice(p) });
+    toastTimer.current = setTimeout(() => setToast(null), 6000);
+    fetchProducts().catch(() => {});
+  }, [t]);
+
+  async function undoQuick() {
+    if (!toast) return;
+    const last = toast;
+    setToast(null);
+    const { error: err } = await supabase.from("movements").delete().eq("id", last.id);
+    if (!err) {
+      bump(last.product.id, -1);
+      fetchProducts().catch(() => {});
+    }
   }
 
   useEffect(() => {
@@ -183,10 +237,26 @@ export default function MovementPage() {
     );
   }
 
+  const todayPieces = Object.values(today).reduce((s, v) => s + v, 0);
+
   return (
     <Shell title={title}>
+      {isSale && (
+        <Link href="/ventes" className="sales-link">
+          <Icon name="list" size={26} />
+          <span>
+            <b>{t("my_sales")}</b>
+            <small>
+              {t("sold_today")} : {todayPieces}
+            </small>
+          </span>
+          <span className="flip">
+            <Icon name="next" size={24} />
+          </span>
+        </Link>
+      )}
       <p className="choose">
-        <Icon name="hand" size={24} /> {t("choose_product")}
+        <Icon name="hand" size={24} /> {isSale ? t("tap_plus_hint") : t("choose_product")}
       </p>
       <div className="row sticky-tools">
         <div className="search">
@@ -213,8 +283,30 @@ export default function MovementPage() {
       ) : (
         <div className="plist">
           {filtered.map((p) => (
-            <ProductCard key={p.id} p={p} onClick={pick} showMoney={false} />
+            <ProductCard
+              key={p.id}
+              p={p}
+              onClick={pick}
+              showMoney={false}
+              onQuick={isSale ? quickSell : undefined}
+              today={today[p.id] || 0}
+            />
           ))}
+        </div>
+      )}
+      {toast && (
+        <div className="toast" role="status">
+          <Icon name="check" size={26} stroke={3} />
+          <span className="toast-text">
+            <b>1 × {toast.product.name}</b>
+            <small>
+              {timeOf(toast.at)}
+              {toast.amount > 0 && <> · {fcfa(toast.amount)}</>}
+            </small>
+          </span>
+          <button type="button" onClick={undoQuick}>
+            <Icon name="x" size={20} /> {t("undo")}
+          </button>
         </div>
       )}
       {scan && <BarcodeScanner onClose={() => setScan(false)} onDetected={onScanned} />}

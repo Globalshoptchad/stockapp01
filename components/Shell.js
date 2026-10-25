@@ -56,7 +56,9 @@ export default function Shell({ title, backHref, nav = true, children }) {
         <nav className="bottom-nav">
           {tabs.map((tab) => {
             const active =
-              pathname === tab.href || (tab.href === "/catalogue" && pathname.startsWith("/produit"));
+              pathname === tab.href ||
+              (tab.href === "/catalogue" && pathname.startsWith("/produit")) ||
+              (tab.href === "/mouvement/vente" && pathname.startsWith("/ventes"));
             return (
               <Link
                 key={tab.href}
