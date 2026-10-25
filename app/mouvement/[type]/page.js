@@ -57,22 +57,27 @@ export default function MovementPage() {
     setToday((old) => ({ ...old, [id]: Math.max(0, (old[id] || 0) + deltaPieces) }));
   }
 
-  // Vente rapide : 1 pièce, enregistrée tout de suite avec la date et l'heure
-  const quickSell = useCallback(async (p) => {
-    if (stockOf(p) < 1) return;
-    bump(p.id, 1);
+  // Vente rapide : le nombre tapé (1 par défaut), enregistré tout de suite avec la date et l'heure
+  const quickSell = useCallback(async (p, n = 1) => {
+    const qty = Math.max(1, parseInt(n, 10) || 1);
+    if (stockOf(p) < qty) {
+      setError(`${t("not_enough")} ${stockOf(p)} ${t("pieces")}`);
+      return;
+    }
+    setError("");
+    bump(p.id, qty);
     const { data, error: err } = await supabase
       .from("movements")
-      .insert({ product_id: p.id, type: "out", quantity: 1, unit: "piece" })
+      .insert({ product_id: p.id, type: "out", quantity: qty, unit: "piece" })
       .select("id,created_at")
       .single();
     if (err) {
-      bump(p.id, -1);
+      bump(p.id, -qty);
       setError(t("error_generic"));
       return;
     }
     clearTimeout(toastTimer.current);
-    setToast({ id: data.id, product: p, at: data.created_at, amount: piecePrice(p) });
+    setToast({ id: data.id, product: p, qty, at: data.created_at, amount: piecePrice(p) * qty });
     toastTimer.current = setTimeout(() => setToast(null), 6000);
     fetchProducts().catch(() => {});
   }, [t]);
@@ -83,7 +88,7 @@ export default function MovementPage() {
     setToast(null);
     const { error: err } = await supabase.from("movements").delete().eq("id", last.id);
     if (!err) {
-      bump(last.product.id, -1);
+      bump(last.product.id, -last.qty);
       fetchProducts().catch(() => {});
     }
   }
@@ -298,7 +303,9 @@ export default function MovementPage() {
         <div className="toast" role="status">
           <Icon name="check" size={26} stroke={3} />
           <span className="toast-text">
-            <b>1 × {toast.product.name}</b>
+            <b>
+              {toast.qty} × {toast.product.name}
+            </b>
             <small>
               {timeOf(toast.at)}
               {toast.amount > 0 && <> · {fcfa(toast.amount)}</>}

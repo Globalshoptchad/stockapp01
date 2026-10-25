@@ -14,6 +14,36 @@ export function ProductImage({ p }) {
   return <img src={p.photo_url} alt="" loading="lazy" decoding="async" onError={() => setBroken(true)} />;
 }
 
+// Vente rapide : une case pour le nombre vendu (vide = 1) + le chariot rouge qui enregistre tout de suite
+function QuickSell({ p, left, onQuick }) {
+  const [n, setN] = useState("");
+  const qty = Math.max(1, parseInt(n, 10) || 1);
+  const tooMuch = qty > left;
+  return (
+    <div className="pquick">
+      <input
+        className={"quick-n" + (tooMuch && n ? " bad" : "")}
+        inputMode="numeric"
+        placeholder="1"
+        value={n}
+        onChange={(e) => setN(e.target.value.replace(/\D/g, "").slice(0, 5))}
+        aria-label="Nombre vendu"
+      />
+      <button
+        type="button"
+        className="quick-plus"
+        disabled={left <= 0 || tooMuch}
+        onClick={() => {
+          onQuick(p, qty);
+          setN("");
+        }}
+      >
+        <Icon name="cart" size={30} /> +{n ? qty : ""}
+      </button>
+    </div>
+  );
+}
+
 // Carte produit en grand : photo, nom, « Ce qui est vendu » / « Ce qui reste », bénéfice.
 // onQuick : vente rapide (+1) sans passer par l'écran de quantité ; today = vendu aujourd'hui
 function ProductCard({ p, href, onClick, onDelete, onQuick, today = 0, selected, showMoney = true }) {
@@ -76,16 +106,7 @@ function ProductCard({ p, href, onClick, onDelete, onQuick, today = 0, selected,
           {body}
         </button>
       )}
-      {onQuick && (
-        <div className="pquick">
-          <button type="button" className="quick-other" onClick={() => onClick && onClick(p)}>
-            <Icon name="hand" size={22} /> {t("other_qty")}
-          </button>
-          <button type="button" className="quick-plus" onClick={() => onQuick(p)} disabled={left <= 0}>
-            <Icon name="cart" size={26} /> +1
-          </button>
-        </div>
-      )}
+      {onQuick && <QuickSell p={p} left={left} onQuick={onQuick} />}
       {onDelete && (
         <button type="button" className="pdel" onClick={del} disabled={busy} aria-label={t("delete")}>
           <Icon name="trash" size={22} />
