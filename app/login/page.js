@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Icon from "../../components/Icons";
 import LangToggle from "../../components/LangToggle";
+import { AppLogo } from "../../components/CartonArt";
+import { clearProductsCache } from "../../lib/products";
 import { useLang } from "../../components/Providers";
 import { supabase } from "../../lib/supabaseClient";
 import { cleanPhone, phoneToEmail, pinToPassword } from "../../lib/helpers";
@@ -31,6 +33,7 @@ export default function LoginPage() {
       setLoading(false);
       return;
     }
+    clearProductsCache();
     router.replace("/catalogue");
   }
 
@@ -39,10 +42,7 @@ export default function LoginPage() {
       <div className="auth-lang">
         <LangToggle />
       </div>
-      <div className="logo">
-        <Icon name="box" size={56} />
-      </div>
-      <h1 className="auth-title">{t("app_name")}</h1>
+      <AppLogo size={150} />
       <form onSubmit={submit}>
         {error && <div className="error">{error}</div>}
         <div className="field">

@@ -8,39 +8,32 @@ import ProductCard from "../../components/ProductCard";
 import BarcodeScanner from "../../components/BarcodeScanner";
 import { useLang } from "../../components/Providers";
 import { useRequireAuth } from "../../lib/useRequireAuth";
-import { supabase } from "../../lib/supabaseClient";
+import { cachedProducts, fetchProducts, filterProducts } from "../../lib/products";
 
 export default function CataloguePage() {
   const { t } = useLang();
   const router = useRouter();
   const { ready } = useRequireAuth();
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState(null);
   const [q, setQ] = useState("");
   const [scan, setScan] = useState(false);
   const [notFound, setNotFound] = useState("");
 
   useEffect(() => {
     if (!ready) return;
-    supabase
-      .from("product_stock")
-      .select("*")
-      .order("name")
-      .then(({ data }) => {
-        setProducts(data || []);
-        setLoading(false);
-      });
+    const c = cachedProducts();
+    if (c) setProducts(c);
+    fetchProducts()
+      .then(setProducts)
+      .catch(() => setProducts((old) => old || []));
   }, [ready]);
 
-  const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    if (!s) return products;
-    return products.filter((p) => p.name.toLowerCase().includes(s) || (p.barcode || "").includes(s));
-  }, [products, q]);
+  const list = products || [];
+  const filtered = useMemo(() => filterProducts(list, q), [list, q]);
 
   function onScanned(code) {
     setScan(false);
-    const found = products.find((p) => p.barcode === code);
+    const found = list.find((p) => p.barcode === code);
     if (found) router.push(`/produit/${found.id}`);
     else setNotFound(code);
   }
@@ -49,13 +42,18 @@ export default function CataloguePage() {
 
   return (
     <Shell title={t("products")}>
-      <div className="row">
+      <div className="row sticky-tools">
         <div className="search">
-          <Icon name="search" size={20} />
+          <Icon name="search" size={22} />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("search")} />
+          {q && (
+            <button type="button" className="clear-btn" onClick={() => setQ("")} aria-label={t("cancel")}>
+              <Icon name="x" size={20} />
+            </button>
+          )}
         </div>
         <button className="icon-btn big" onClick={() => setScan(true)} aria-label={t("scan")}>
-          <Icon name="scan" size={26} />
+          <Icon name="scan" size={28} />
         </button>
       </div>
 
@@ -68,24 +66,33 @@ export default function CataloguePage() {
         </div>
       )}
 
-      {loading ? (
-        <p className="muted">{t("loading")}</p>
-      ) : products.length === 0 ? (
+      {products === null ? (
+        <div className="grid">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="pcard skeleton" />
+          ))}
+        </div>
+      ) : list.length === 0 ? (
         <div className="empty">
           <Icon name="box" size={72} />
           <p>{t("empty_catalogue")}</p>
           <small>{t("empty_catalogue_hint")}</small>
         </div>
       ) : (
-        <div className="grid">
-          {filtered.map((p) => (
-            <ProductCard key={p.id} p={p} href={`/produit/${p.id}`} />
-          ))}
-        </div>
+        <>
+          <p className="count">
+            <Icon name="box" size={18} /> {filtered.length}
+          </p>
+          <div className="grid">
+            {filtered.map((p) => (
+              <ProductCard key={p.id} p={p} href={`/produit/${p.id}`} />
+            ))}
+          </div>
+        </>
       )}
 
       <Link href="/produit/nouveau" className="fab" aria-label={t("add_product")}>
-        <Icon name="plus" size={32} stroke={3} />
+        <Icon name="plus" size={34} stroke={3} />
       </Link>
 
       {scan && <BarcodeScanner onClose={() => setScan(false)} onDetected={onScanned} />}

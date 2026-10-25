@@ -5,6 +5,7 @@ import Icon from "./Icons";
 import LangToggle from "./LangToggle";
 import { useLang } from "./Providers";
 import { supabase } from "../lib/supabaseClient";
+import { clearProductsCache } from "../lib/products";
 
 const tabs = [
   { href: "/catalogue", icon: "box", key: "products", tone: "" },
@@ -20,6 +21,7 @@ export default function Shell({ title, backHref, nav = true, children }) {
 
   async function logout() {
     await supabase.auth.signOut();
+    clearProductsCache();
     router.replace("/login");
   }
 

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Icon from "../../components/Icons";
 import LangToggle from "../../components/LangToggle";
+import { AppLogo } from "../../components/CartonArt";
+import { clearProductsCache } from "../../lib/products";
 import { useLang } from "../../components/Providers";
 import { supabase } from "../../lib/supabaseClient";
 import { cleanPhone, phoneToEmail, pinToPassword } from "../../lib/helpers";
@@ -31,7 +33,9 @@ export default function SignupPage() {
       options: { data: { shop_name: shop.trim(), phone: cleanPhone(phone) } },
     });
     if (err) {
-      setError(/registered|exists/i.test(err.message) ? t("phone_used") : "Erreur : " + err.message);
+      setError(/registered|exists/i.test(err.message) ? t("phone_used") : t("error_generic"));
+      setLoading(false);
+      return;
     }
     if (!data.session) {
       // La confirmation e-mail est encore active dans Supabase : on tente quand même la connexion
@@ -45,6 +49,7 @@ export default function SignupPage() {
         return;
       }
     }
+    clearProductsCache();
     router.replace("/catalogue");
   }
 
@@ -53,10 +58,7 @@ export default function SignupPage() {
       <div className="auth-lang">
         <LangToggle />
       </div>
-      <div className="logo">
-        <Icon name="box" size={56} />
-      </div>
-      <h1 className="auth-title">{t("app_name")}</h1>
+      <AppLogo size={150} />
       <form onSubmit={submit}>
         {error && <div className="error">{error}</div>}
         <div className="field">

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Shell from "../../../components/Shell";
 import Icon from "../../../components/Icons";
@@ -8,6 +8,7 @@ import BarcodeScanner from "../../../components/BarcodeScanner";
 import { useLang } from "../../../components/Providers";
 import { useRequireAuth } from "../../../lib/useRequireAuth";
 import { supabase } from "../../../lib/supabaseClient";
+import { cachedProducts, fetchProducts, filterProducts } from "../../../lib/products";
 
 // Une seule page pour les deux gestes : "entree" (marchandise reçue) et "vente" (produit vendu)
 export default function MovementPage() {
@@ -23,26 +24,38 @@ export default function MovementPage() {
   const [error, setError] = useState("");
   const [done, setDone] = useState(null);
   const [scan, setScan] = useState(false);
+  const [q, setQ] = useState("");
 
   async function load() {
-    const { data } = await supabase.from("product_stock").select("*").order("name");
-    setProducts(data || []);
+    try {
+      setProducts(await fetchProducts());
+    } catch {}
     setLoading(false);
   }
 
   useEffect(() => {
-    if (ready) load();
+    if (!ready) return;
+    const c = cachedProducts();
+    if (c) {
+      setProducts(c);
+      setLoading(false);
+    }
+    load();
   }, [ready]);
+
+  const filtered = useMemo(() => filterProducts(products, q), [products, q]);
 
   function stockOf(p) {
     return (p.total_in || 0) - (p.total_out || 0);
   }
 
-  function pick(p) {
+  const pick = useCallback((p) => {
     setSelected(p);
     setQty(1);
     setError("");
-  }
+    setQ("");
+    window.scrollTo(0, 0);
+  }, []);
 
   function onScanned(code) {
     setScan(false);
@@ -100,7 +113,7 @@ export default function MovementPage() {
     return (
       <Shell title={title}>
         <div className="picked">
-          <ProductCard p={selected} onClick={() => {}} />
+          <ProductCard p={selected} />
         </div>
         {error && <div className="error">{error}</div>}
         <label className="qty-label">{t("quantity")}</label>
@@ -120,6 +133,13 @@ export default function MovementPage() {
             <Icon name="plus" size={36} stroke={3} />
           </button>
         </div>
+        <div className="quick-qty">
+          {[5, 10, 20, 50].map((n) => (
+            <button key={n} type="button" className={"chip" + (Number(qty) === n ? " on" : "")} onClick={() => setQty(n)}>
+              {n}
+            </button>
+          ))}
+        </div>
         <button className={"btn " + tone} onClick={confirm} disabled={saving}>
           <Icon name="check" size={26} /> {saving ? t("loading") : t("confirm")}
         </button>
@@ -132,10 +152,21 @@ export default function MovementPage() {
 
   return (
     <Shell title={title}>
-      <div className="row">
-        <p className="choose">{t("choose_product")}</p>
+      <p className="choose">
+        <Icon name="hand" size={24} /> {t("choose_product")}
+      </p>
+      <div className="row sticky-tools">
+        <div className="search">
+          <Icon name="search" size={22} />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("search")} />
+          {q && (
+            <button type="button" className="clear-btn" onClick={() => setQ("")} aria-label={t("cancel")}>
+              <Icon name="x" size={20} />
+            </button>
+          )}
+        </div>
         <button className="icon-btn big" onClick={() => setScan(true)} aria-label={t("scan")}>
-          <Icon name="scan" size={26} />
+          <Icon name="scan" size={28} />
         </button>
       </div>
       {error && <div className="error">{error}</div>}
@@ -148,8 +179,8 @@ export default function MovementPage() {
         </div>
       ) : (
         <div className="grid">
-          {products.map((p) => (
-            <ProductCard key={p.id} p={p} onClick={() => pick(p)} />
+          {filtered.map((p) => (
+            <ProductCard key={p.id} p={p} onClick={pick} />
           ))}
         </div>
       )}

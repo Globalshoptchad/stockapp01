@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Shell from "../../components/Shell";
-import Icon from "../../components/Icons";
+import { ProductImage } from "../../components/ProductCard";
 import { useLang } from "../../components/Providers";
 import { useRequireAuth } from "../../lib/useRequireAuth";
 import { supabase } from "../../lib/supabaseClient";
@@ -87,7 +87,7 @@ export default function BilanPage() {
               {best.map((r) => (
                 <li key={r.product_id}>
                   <div className="bimg">
-                    {r.photo_url ? <img src={r.photo_url} alt="" /> : <Icon name="box" size={24} />}
+                    <ProductImage p={r} />
                   </div>
                   <div className="bmid">
                     <div className="bname">{r.name}</div>
@@ -108,7 +108,7 @@ export default function BilanPage() {
                 {empty.map((r) => (
                   <div key={r.product_id} className="pcard static">
                     <div className="pimg">
-                      {r.photo_url ? <img src={r.photo_url} alt={r.name} /> : <Icon name="box" size={36} />}
+                      <ProductImage p={r} />
                     </div>
                     <div className="pname">{r.name}</div>
                   </div>
