@@ -5,6 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import Shell from "../../../components/Shell";
 import Icon from "../../../components/Icons";
 import ProductForm from "../../../components/ProductForm";
+import { MoneyNumbers, StockNumbers } from "../../../components/StockSummary";
+import { fetchProducts, packSize } from "../../../lib/products";
 import { useLang } from "../../../components/Providers";
 import { useRequireAuth } from "../../../lib/useRequireAuth";
 import { supabase } from "../../../lib/supabaseClient";
@@ -43,6 +45,7 @@ export default function ProductPage() {
     if (!window.confirm(t("confirm_delete_movement"))) return;
     await supabase.from("movements").delete().eq("id", mid);
     load();
+    fetchProducts().catch(() => {});
   }
 
   if (!ready || loading) return <div className="center-screen">…</div>;
@@ -51,28 +54,17 @@ export default function ProductPage() {
     return null;
   }
 
-  const stock = (product.total_in || 0) - (product.total_out || 0);
-
   return (
-    <Shell title={t("edit_product")} backHref="/catalogue" nav={false}>
-      <div className="summary">
-        <div className="sum green">
-          <small>{t("entered")}</small>
-          <b>{product.total_in || 0}</b>
-        </div>
-        <div className="sum red">
-          <small>{t("sold")}</small>
-          <b>{product.total_out || 0}</b>
-        </div>
-        <div className={"sum big" + (stock <= 0 ? " zero" : "")}>
-          <small>{t("remaining")}</small>
-          <b>{stock}</b>
-        </div>
-      </div>
+    <Shell title={product.name || t("edit_product")} backHref="/catalogue" nav={false}>
+      <StockNumbers p={product} />
+      <MoneyNumbers p={product} />
 
       <ProductForm
         initial={product}
-        onSaved={() => load()}
+        onSaved={() => {
+          load();
+          fetchProducts().catch(() => {});
+        }}
         onDeleted={() => router.replace("/catalogue")}
       />
 
@@ -86,7 +78,17 @@ export default function ProductPage() {
               <span className="mi">
                 <Icon name={m.type === "in" ? "plus" : "minus"} size={20} stroke={3} />
               </span>
-              <span className="mq">{m.quantity}</span>
+              <span className="mq">
+                {m.unit === "pack" && packSize(product) > 1 ? (
+                  <>
+                    {Math.round(m.quantity / packSize(product))} <small>{t("packs")}</small>
+                  </>
+                ) : (
+                  <>
+                    {m.quantity} <small>{t("pieces")}</small>
+                  </>
+                )}
+              </span>
               <span className="md">{formatDate(m.created_at, lang)}</span>
               <button className="icon-btn" onClick={() => removeMove(m.id)} aria-label={t("delete")}>
                 <Icon name="trash" size={20} />

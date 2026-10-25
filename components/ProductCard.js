@@ -1,57 +1,81 @@
 "use client";
 import { memo, useState } from "react";
 import Link from "next/link";
+import Icon from "./Icons";
 import { useLang } from "./Providers";
 import { ProductCarton } from "./CartonArt";
-import { thumbUrl } from "../lib/products";
+import { StockNumbers } from "./StockSummary";
+import { fcfa, hasPrices, isLow, moneyOf, stockOf } from "../lib/products";
 
-// Image du produit : miniature d'abord, grande photo si la miniature n'existe pas, carton dessiné sinon.
-export function ProductImage({ p, full = false }) {
-  const [step, setStep] = useState(0); // 0 = miniature, 1 = grande photo, 2 = carton
-  if (!p.photo_url || step === 2) return <ProductCarton seed={p.id || p.product_id || p.name} />;
-  const src = step === 0 && !full ? thumbUrl(p.photo_url) : p.photo_url;
-  return (
-    <img
-      src={src}
-      alt=""
-      loading="lazy"
-      decoding="async"
-      onError={() => setStep((s) => (s === 0 && !full ? 1 : 2))}
-    />
-  );
+// Photo du produit en grand ; carton dessiné s'il n'y a pas de photo (ou si elle ne charge pas)
+export function ProductImage({ p }) {
+  const [broken, setBroken] = useState(false);
+  if (!p.photo_url || broken) return <ProductCarton seed={p.id || p.product_id || p.name} />;
+  return <img src={p.photo_url} alt="" loading="lazy" decoding="async" onError={() => setBroken(true)} />;
 }
 
-// Carte produit : grande image, nom, et le stock restant bien visible (vert = il en reste, rouge = fini).
-function ProductCard({ p, href, onClick, selected }) {
+// Carte produit en grand : photo, nom, « Ce qui est vendu » / « Ce qui reste », bénéfice.
+function ProductCard({ p, href, onClick, onDelete, selected, showMoney = true }) {
   const { t } = useLang();
-  const stock = (p.total_in || 0) - (p.total_out || 0);
-  const low = stock > 0 && stock <= 3;
+  const [busy, setBusy] = useState(false);
+  const left = stockOf(p);
+  const money = showMoney && hasPrices(p) ? moneyOf(p) : null;
 
-  const inner = (
+  const body = (
     <>
       <div className="pimg">
         <ProductImage p={p} />
-        <span className={"pbadge" + (stock <= 0 ? " zero" : low ? " low" : "")}>{stock <= 0 ? 0 : stock}</span>
+        {left <= 0 && <span className="ptag zero">{t("out_of_stock")}</span>}
+        {isLow(p) && (
+          <span className="ptag low">
+            <Icon name="alert" size={16} /> {t("low_stock")}
+          </span>
+        )}
       </div>
-      <div className="pname">{p.name}</div>
-      <div className={"pstock" + (stock <= 0 ? " zero" : "")}>
-        {stock <= 0 ? t("out_of_stock") : ""}
+      <div className="pbody">
+        <div className="pname">{p.name}</div>
+        <StockNumbers p={p} compact />
+        {money && (
+          <div className={"pmoney" + (money.profit < 0 ? " neg" : "")}>
+            <span>
+              <Icon name="trend" size={18} /> {money.profit < 0 ? t("loss") : t("profit")}
+            </span>
+            <b>{fcfa(Math.abs(money.profit))}</b>
+          </div>
+        )}
       </div>
     </>
   );
 
-  const cls = "pcard" + (selected ? " sel" : "") + (stock <= 0 ? " empty-stock" : "");
-  if (href) {
-    return (
-      <Link href={href} className={cls} prefetch={false}>
-        {inner}
-      </Link>
-    );
+  async function del() {
+    if (!window.confirm(t("confirm_delete_card"))) return;
+    setBusy(true);
+    try {
+      await onDelete(p);
+    } catch {
+      setBusy(false);
+      window.alert(t("error_generic"));
+    }
   }
+
+  const cls = "pcard" + (selected ? " sel" : "") + (left <= 0 ? " empty-stock" : "") + (busy ? " busy" : "");
   return (
-    <button type="button" className={cls} onClick={() => onClick && onClick(p)}>
-      {inner}
-    </button>
+    <div className={cls}>
+      {href ? (
+        <Link href={href} className="pmain" prefetch={false}>
+          {body}
+        </Link>
+      ) : (
+        <button type="button" className="pmain" onClick={() => onClick && onClick(p)} disabled={!onClick}>
+          {body}
+        </button>
+      )}
+      {onDelete && (
+        <button type="button" className="pdel" onClick={del} disabled={busy} aria-label={t("delete")}>
+          <Icon name="trash" size={22} />
+        </button>
+      )}
+    </div>
   );
 }
 

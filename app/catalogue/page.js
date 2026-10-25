@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Shell from "../../components/Shell";
@@ -8,7 +8,7 @@ import ProductCard from "../../components/ProductCard";
 import BarcodeScanner from "../../components/BarcodeScanner";
 import { useLang } from "../../components/Providers";
 import { useRequireAuth } from "../../lib/useRequireAuth";
-import { cachedProducts, fetchProducts, filterProducts } from "../../lib/products";
+import { cachedProducts, deleteProduct, fetchProducts, filterProducts } from "../../lib/products";
 
 export default function CataloguePage() {
   const { t } = useLang();
@@ -27,6 +27,12 @@ export default function CataloguePage() {
       .then(setProducts)
       .catch(() => setProducts((old) => old || []));
   }, [ready]);
+
+  // Supprime le produit + sa photo (l'espace est libéré) et l'enlève de la liste tout de suite
+  const onDelete = useCallback(async (p) => {
+    await deleteProduct(p);
+    setProducts((old) => (old || []).filter((x) => x.id !== p.id));
+  }, []);
 
   const list = products || [];
   const filtered = useMemo(() => filterProducts(list, q), [list, q]);
@@ -67,8 +73,8 @@ export default function CataloguePage() {
       )}
 
       {products === null ? (
-        <div className="grid">
-          {Array.from({ length: 6 }).map((_, i) => (
+        <div className="plist">
+          {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="pcard skeleton" />
           ))}
         </div>
@@ -83,9 +89,9 @@ export default function CataloguePage() {
           <p className="count">
             <Icon name="box" size={18} /> {filtered.length}
           </p>
-          <div className="grid">
+          <div className="plist">
             {filtered.map((p) => (
-              <ProductCard key={p.id} p={p} href={`/produit/${p.id}`} />
+              <ProductCard key={p.id} p={p} href={`/produit/${p.id}`} onDelete={onDelete} />
             ))}
           </div>
         </>

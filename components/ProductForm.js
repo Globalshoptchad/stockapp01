@@ -5,30 +5,49 @@ import BarcodeScanner from "./BarcodeScanner";
 import { useLang } from "./Providers";
 import { supabase } from "../lib/supabaseClient";
 import { compressImage, uniqueId } from "../lib/helpers";
-import { thumbUrl } from "../lib/products";
+import { BUCKET, deleteProduct, fcfa, photoPaths } from "../lib/products";
 
-const BUCKET = "product-photos";
+// Garde seulement les chiffres ("20 000" -> "20000")
+const digits = (v) => String(v || "").replace(/\D/g, "");
+const num = (v) => Number(digits(v)) || 0;
+// Affiche "20000" en "20 000" pendant la saisie
+const spaced = (v) => digits(v).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+const initNum = (v) => (v === null || v === undefined || Number(v) === 0 ? "" : String(Math.round(Number(v))));
 
-function pathFromUrl(url) {
-  if (!url) return null;
-  const marker = `/${BUCKET}/`;
-  const i = url.indexOf(marker);
-  return i === -1 ? null : url.slice(i + marker.length);
+// Champ de prix : gros chiffres, "FCFA" à côté
+function MoneyInput({ label, icon, value, onChange, placeholder, hint, tone }) {
+  const { t } = useLang();
+  return (
+    <div className={"field money " + (tone || "")}>
+      <label>
+        <Icon name={icon} size={22} /> {label}
+      </label>
+      <div className="money-box">
+        <input
+          className="input"
+          inputMode="numeric"
+          value={spaced(value)}
+          placeholder={placeholder}
+          onChange={(e) => onChange(digits(e.target.value))}
+          autoComplete="off"
+        />
+        <span className="money-cur">{t("currency")}</span>
+      </div>
+      {hint && <small className="hint">{hint}</small>}
+    </div>
+  );
 }
 
-// Chemins à supprimer pour une photo : la grande + sa miniature
-function photoPaths(url) {
-  const a = pathFromUrl(url);
-  const b = pathFromUrl(thumbUrl(url));
-  return [a, b].filter((x, i, arr) => x && arr.indexOf(x) === i);
-}
-
-// Formulaire pour ajouter OU modifier un produit (photo + nom + code-barres optionnel)
+// Formulaire pour ajouter OU modifier un produit : photo, nom, prix, code-barres (optionnel)
 export default function ProductForm({ initial, defaultBarcode = "", onSaved, onDeleted }) {
   const { t } = useLang();
   const editing = !!initial;
   const [name, setName] = useState(initial?.name || "");
   const [barcode, setBarcode] = useState(initial?.barcode || defaultBarcode || "");
+  const [pack, setPack] = useState(initial?.pack_size ? String(initial.pack_size) : "1");
+  const [buy, setBuy] = useState(initNum(initial?.buy_price));
+  const [sell, setSell] = useState(initNum(initial?.sell_price));
+  const [sellPiece, setSellPiece] = useState(initial?.sell_price_piece != null ? initNum(initial.sell_price_piece) : "");
   const [photoUrl] = useState(initial?.photo_url || "");
   const [newFile, setNewFile] = useState(null);
   const [preview, setPreview] = useState("");
@@ -36,6 +55,14 @@ export default function ProductForm({ initial, defaultBarcode = "", onSaved, onD
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const fileRef = useRef(null);
+
+  const packN = Math.max(1, num(pack) || 1);
+  const isPack = packN > 1;
+  const autoPiece = num(sell) / packN;
+  const piece = isPack && sellPiece !== "" ? num(sellPiece) : autoPiece;
+  const profitPack = num(sell) - num(buy);
+  const profitPiece = piece - num(buy) / packN;
+  const showProfit = num(sell) > 0 || (isPack && num(sellPiece) > 0);
 
   function onPick(e) {
     const f = e.target.files && e.target.files[0];
@@ -73,19 +100,28 @@ export default function ProductForm({ initial, defaultBarcode = "", onSaved, onD
 
       let finalUrl = photoUrl;
       if (newFile) {
-        // grande photo (~800px) pour la fiche produit + miniature (~320px) pour la grille
-        const [blob, thumb] = await Promise.all([compressImage(newFile), compressImage(newFile, 320, 0.7)]);
-        const base = `${uid}/${uniqueId()}`;
-        const opts = { contentType: "image/jpeg", cacheControl: "31536000" }; // nom unique → gardé en cache 1 an
-        const { error: upErr } = await supabase.storage.from(BUCKET).upload(`${base}.jpg`, blob, opts);
+        // Photo en grand (~1000px), compressée pour ne pas consommer trop de données mobiles
+        const blob = await compressImage(newFile, 1000, 0.72);
+        const path = `${uid}/${uniqueId()}.jpg`;
+        const { error: upErr } = await supabase.storage
+          .from(BUCKET)
+          .upload(path, blob, { contentType: "image/jpeg", cacheControl: "31536000" });
         if (upErr) throw upErr;
-        await supabase.storage.from(BUCKET).upload(`${base}_t.jpg`, thumb, opts); // si ça rate, la grande photo sert
-        finalUrl = supabase.storage.from(BUCKET).getPublicUrl(`${base}.jpg`).data.publicUrl;
+        finalUrl = supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+        // L'ancienne photo est effacée : la place est libérée
         const old = photoPaths(photoUrl);
         if (old.length) await supabase.storage.from(BUCKET).remove(old);
       }
 
-      const row = { name: cleanName, barcode: code, photo_url: finalUrl || null };
+      const row = {
+        name: cleanName,
+        barcode: code,
+        photo_url: finalUrl || null,
+        pack_size: packN,
+        buy_price: num(buy),
+        sell_price: num(sell),
+        sell_price_piece: isPack && sellPiece !== "" ? num(sellPiece) : null,
+      };
       if (editing) {
         const { error: err } = await supabase.from("products").update(row).eq("id", initial.id);
         if (err) throw err;
@@ -94,6 +130,7 @@ export default function ProductForm({ initial, defaultBarcode = "", onSaved, onD
         if (err) throw err;
       }
       if (onSaved) onSaved();
+      setSaving(false);
     } catch (err) {
       console.error(err);
       setError(t("error_generic"));
@@ -102,17 +139,15 @@ export default function ProductForm({ initial, defaultBarcode = "", onSaved, onD
   }
 
   async function remove() {
-    if (!window.confirm(t("confirm_delete_product"))) return;
+    if (!window.confirm(t("confirm_delete_card"))) return;
     setSaving(true);
-    const old = photoPaths(photoUrl);
-    const { error: err } = await supabase.from("products").delete().eq("id", initial.id);
-    if (err) {
+    try {
+      await deleteProduct(initial);
+      if (onDeleted) onDeleted();
+    } catch {
       setError(t("error_generic"));
       setSaving(false);
-      return;
     }
-    if (old.length) await supabase.storage.from(BUCKET).remove(old);
-    if (onDeleted) onDeleted();
   }
 
   const shownPhoto = preview || photoUrl;
@@ -131,13 +166,78 @@ export default function ProductForm({ initial, defaultBarcode = "", onSaved, onD
 
       <div className="field">
         <label>{t("product_name")}</label>
-        <input
-          className="input"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          maxLength={80}
-          autoComplete="off"
+        <input className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} autoComplete="off" />
+      </div>
+
+      <div className="price-block">
+        <h3 className="block-title">
+          <Icon name="coins" size={24} /> {t("prices")}
+        </h3>
+
+        <div className="field">
+          <label>
+            <Icon name="box" size={22} /> {t("pack_size_q")}
+          </label>
+          <div className="stepper">
+            <button type="button" className="qty-btn sm" onClick={() => setPack(String(Math.max(1, packN - 1)))}>
+              <Icon name="minus" size={28} stroke={3} />
+            </button>
+            <input
+              className="input center big-num"
+              inputMode="numeric"
+              value={pack}
+              onChange={(e) => setPack(digits(e.target.value).slice(0, 5))}
+              onBlur={() => setPack(String(packN))}
+            />
+            <button type="button" className="qty-btn sm" onClick={() => setPack(String(packN + 1))}>
+              <Icon name="plus" size={28} stroke={3} />
+            </button>
+          </div>
+          <small className="hint">{t("pack_size_hint")}</small>
+        </div>
+
+        <MoneyInput
+          label={isPack ? t("buy_price_q") : t("buy_price_one")}
+          icon="download"
+          tone="green"
+          value={buy}
+          onChange={setBuy}
+          placeholder="0"
         />
+        <MoneyInput
+          label={isPack ? t("sell_price_q") : t("piece_price_q")}
+          icon="cart"
+          tone="red"
+          value={sell}
+          onChange={setSell}
+          placeholder="0"
+        />
+        {isPack && (
+          <MoneyInput
+            label={t("piece_price_q")}
+            icon="cart"
+            tone="red"
+            value={sellPiece}
+            onChange={setSellPiece}
+            placeholder={autoPiece ? String(Math.round(autoPiece)) : "0"}
+            hint={t("piece_price_hint")}
+          />
+        )}
+
+        {showProfit && (
+          <div className="profit-preview">
+            {isPack && (
+              <div className={"pp " + (profitPack < 0 ? "neg" : "")}>
+                <small>{t("profit_per_pack")}</small>
+                <b>{fcfa(profitPack)}</b>
+              </div>
+            )}
+            <div className={"pp " + (profitPiece < 0 ? "neg" : "")}>
+              <small>{t("profit_per_piece")}</small>
+              <b>{fcfa(profitPiece)}</b>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="field">

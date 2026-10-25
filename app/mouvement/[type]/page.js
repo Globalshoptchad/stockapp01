@@ -8,7 +8,7 @@ import BarcodeScanner from "../../../components/BarcodeScanner";
 import { useLang } from "../../../components/Providers";
 import { useRequireAuth } from "../../../lib/useRequireAuth";
 import { supabase } from "../../../lib/supabaseClient";
-import { cachedProducts, fetchProducts, filterProducts } from "../../../lib/products";
+import { cachedProducts, fcfa, fetchProducts, filterProducts, packSize, piecePrice, stockOf } from "../../../lib/products";
 
 // Une seule page pour les deux gestes : "entree" (marchandise reçue) et "vente" (produit vendu)
 export default function MovementPage() {
@@ -25,6 +25,7 @@ export default function MovementPage() {
   const [done, setDone] = useState(null);
   const [scan, setScan] = useState(false);
   const [q, setQ] = useState("");
+  const [unit, setUnit] = useState("piece"); // "pack" = carton, "piece" = pièce
 
   async function load() {
     try {
@@ -45,17 +46,15 @@ export default function MovementPage() {
 
   const filtered = useMemo(() => filterProducts(products, q), [products, q]);
 
-  function stockOf(p) {
-    return (p.total_in || 0) - (p.total_out || 0);
-  }
-
   const pick = useCallback((p) => {
     setSelected(p);
     setQty(1);
+    // Marchandise reçue : en carton par défaut. Vente : à la pièce par défaut.
+    setUnit(packSize(p) > 1 && !isSale ? "pack" : "piece");
     setError("");
     setQ("");
     window.scrollTo(0, 0);
-  }, []);
+  }, [isSale]);
 
   function onScanned(code) {
     setScan(false);
@@ -64,24 +63,31 @@ export default function MovementPage() {
     else setError(t("unknown_barcode"));
   }
 
+  // Quantité en pièces (1 carton = pack_size pièces)
+  const size = selected ? packSize(selected) : 1;
+  const mult = unit === "pack" ? size : 1;
+  const nQty = parseInt(qty, 10) || 0;
+  const pieces = nQty * mult;
+  const unitPrice = selected ? (unit === "pack" ? Number(selected.sell_price) || 0 : piecePrice(selected)) : 0;
+
   async function confirm() {
     setError("");
-    const n = parseInt(qty, 10);
-    if (!n || n < 1) return;
-    if (isSale && n > stockOf(selected)) {
-      setError(`${t("not_enough")} ${stockOf(selected)}`);
+    if (!nQty || nQty < 1) return;
+    const left = stockOf(selected);
+    if (isSale && pieces > left) {
+      setError(`${t("not_enough")} ${left} ${t("pieces")}`);
       return;
     }
     setSaving(true);
     const { error: err } = await supabase
       .from("movements")
-      .insert({ product_id: selected.id, type: isSale ? "out" : "in", quantity: n });
+      .insert({ product_id: selected.id, type: isSale ? "out" : "in", quantity: pieces, unit });
     setSaving(false);
     if (err) {
       setError(t("error_generic"));
       return;
     }
-    setDone({ name: selected.name, qty: n });
+    setDone({ name: selected.name, qty: nQty, unit: size > 1 ? unit : "piece", amount: isSale ? nQty * unitPrice : 0 });
     setSelected(null);
     load();
   }
@@ -99,8 +105,9 @@ export default function MovementPage() {
             <Icon name="check" size={64} stroke={3} />
           </div>
           <p className="done-text">
-            {done.qty} × {done.name}
+            {done.qty} {done.unit === "pack" ? t("packs") : t("pieces")} × {done.name}
           </p>
+          {done.amount > 0 && <p className="done-amount">{fcfa(done.amount)}</p>}
           <button className={"btn " + tone} onClick={() => setDone(null)}>
             <Icon name="plus" size={24} /> {t("again")}
           </button>
@@ -113,9 +120,25 @@ export default function MovementPage() {
     return (
       <Shell title={title}>
         <div className="picked">
-          <ProductCard p={selected} />
+          <ProductCard p={selected} showMoney={false} />
         </div>
         {error && <div className="error">{error}</div>}
+        {size > 1 && (
+          <div className="unit-toggle">
+            <button type="button" className={unit === "pack" ? "on" : ""} onClick={() => setUnit("pack")}>
+              <Icon name="box" size={34} />
+              <span>{t("in_packs")}</span>
+              <small>
+                {size} {t("pieces")}
+              </small>
+            </button>
+            <button type="button" className={unit === "piece" ? "on" : ""} onClick={() => setUnit("piece")}>
+              <Icon name="piece" size={34} />
+              <span>{t("in_pieces")}</span>
+              <small>1</small>
+            </button>
+          </div>
+        )}
         <label className="qty-label">{t("quantity")}</label>
         <div className="qty">
           <button type="button" className="qty-btn" onClick={() => setQty(Math.max(1, (parseInt(qty, 10) || 1) - 1))}>
@@ -140,6 +163,16 @@ export default function MovementPage() {
             </button>
           ))}
         </div>
+        {(mult > 1 || (isSale && unitPrice > 0)) && nQty > 0 && (
+          <div className="qty-total">
+            {mult > 1 && (
+              <span>
+                = {pieces} {t("pieces")}
+              </span>
+            )}
+            {isSale && unitPrice > 0 && <b>{fcfa(nQty * unitPrice)}</b>}
+          </div>
+        )}
         <button className={"btn " + tone} onClick={confirm} disabled={saving}>
           <Icon name="check" size={26} /> {saving ? t("loading") : t("confirm")}
         </button>
@@ -178,9 +211,9 @@ export default function MovementPage() {
           <p>{t("empty_catalogue")}</p>
         </div>
       ) : (
-        <div className="grid">
+        <div className="plist">
           {filtered.map((p) => (
-            <ProductCard key={p.id} p={p} onClick={pick} />
+            <ProductCard key={p.id} p={p} onClick={pick} showMoney={false} />
           ))}
         </div>
       )}
