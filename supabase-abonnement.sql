@@ -275,10 +275,11 @@ grant execute on function public.ms_my_status(), public.ms_admin_accounts(text),
   public.ms_admin_remove_staff(uuid) to authenticated;
 
 -- ---------- Propriétaire ----------
--- Remplace 00000000 par TON numéro d'inscription (chiffres seulement), une seule fois :
--- insert into public.staff (user_id, is_owner, perm_accounts, perm_settings)
--- select id, true, true, true from auth.users where email = '00000000@monstock-app.com'
--- on conflict (user_id) do update set is_owner = true, perm_accounts = true, perm_settings = true;
+-- Le compte « Tchara commerce1 » reçoit tous les droits d'administration.
+insert into public.staff (user_id, is_owner, perm_accounts, perm_settings)
+select id, true, true, true from auth.users
+where raw_user_meta_data ->> 'shop_name' = 'Tchara commerce1' and email like '0033%@monstock-app.com'
+on conflict (user_id) do update set is_owner = true, perm_accounts = true, perm_settings = true;
 
 -- ---------- Étape 5 (au moment de la mise en ligne) ----------
 -- Verrouille aussi la base : un compte dont l'accès est fini peut encore VOIR ses données,
