@@ -2,6 +2,7 @@
 import { useRef, useState } from "react";
 import Icon from "./Icons";
 import BarcodeScanner from "./BarcodeScanner";
+import { isOn, useAccountStatus } from "../lib/account";
 import { useLang } from "./Providers";
 import { supabase } from "../lib/supabaseClient";
 import { compressImage, uniqueId } from "../lib/helpers";
@@ -52,6 +53,8 @@ export default function ProductForm({ initial, defaultBarcode = "", onSaved, onD
   const [newFile, setNewFile] = useState(null);
   const [preview, setPreview] = useState("");
   const [scanOpen, setScanOpen] = useState(false);
+  const status = useAccountStatus();
+  const scanOn = !status || isOn((status.settings || {}).feature_scan);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const fileRef = useRef(null);
@@ -250,9 +253,11 @@ export default function ProductForm({ initial, defaultBarcode = "", onSaved, onD
             inputMode="numeric"
             autoComplete="off"
           />
-          <button type="button" className="icon-btn big" onClick={() => setScanOpen(true)} aria-label={t("scan")}>
-            <Icon name="scan" size={26} />
-          </button>
+          {scanOn && (
+            <button type="button" className="icon-btn big" onClick={() => setScanOpen(true)} aria-label={t("scan")}>
+              <Icon name="scan" size={26} />
+            </button>
+          )}
         </div>
       </div>
 

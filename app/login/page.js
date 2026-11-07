@@ -9,6 +9,7 @@ import { clearProductsCache } from "../../lib/products";
 import { useLang } from "../../components/Providers";
 import { supabase } from "../../lib/supabaseClient";
 import { cleanPhone, phoneToEmail, pinToPassword } from "../../lib/helpers";
+import { clearStatus } from "../../lib/account";
 
 export default function LoginPage() {
   const { t } = useLang();
@@ -34,6 +35,7 @@ export default function LoginPage() {
       return;
     }
     clearProductsCache();
+    clearStatus();
     router.replace("/catalogue");
   }
 

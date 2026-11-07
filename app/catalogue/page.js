@@ -8,6 +8,7 @@ import ProductCard from "../../components/ProductCard";
 import BarcodeScanner from "../../components/BarcodeScanner";
 import { useLang } from "../../components/Providers";
 import { useRequireAuth } from "../../lib/useRequireAuth";
+import { isOn, useAccountStatus } from "../../lib/account";
 import { cachedProducts, deleteProduct, fetchProducts, filterProducts } from "../../lib/products";
 
 export default function CataloguePage() {
@@ -17,6 +18,8 @@ export default function CataloguePage() {
   const [products, setProducts] = useState(null);
   const [q, setQ] = useState("");
   const [scan, setScan] = useState(false);
+  const status = useAccountStatus(ready);
+  const scanOn = !status || isOn((status.settings || {}).feature_scan);
   const [notFound, setNotFound] = useState("");
 
   useEffect(() => {
@@ -58,9 +61,11 @@ export default function CataloguePage() {
             </button>
           )}
         </div>
-        <button className="icon-btn big" onClick={() => setScan(true)} aria-label={t("scan")}>
-          <Icon name="scan" size={28} />
-        </button>
+        {scanOn && (
+          <button className="icon-btn big" onClick={() => setScan(true)} aria-label={t("scan")}>
+            <Icon name="scan" size={28} />
+          </button>
+        )}
       </div>
 
       {notFound && (

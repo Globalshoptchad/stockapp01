@@ -6,6 +6,7 @@ import Shell from "../../../components/Shell";
 import Icon from "../../../components/Icons";
 import ProductCard from "../../../components/ProductCard";
 import BarcodeScanner from "../../../components/BarcodeScanner";
+import { isOn, useAccountStatus } from "../../../lib/account";
 import { useLang } from "../../../components/Providers";
 import { useRequireAuth } from "../../../lib/useRequireAuth";
 import { supabase } from "../../../lib/supabaseClient";
@@ -18,6 +19,8 @@ export default function MovementPage() {
   const params = useParams();
   const isSale = params && params.type === "vente";
   const { ready } = useRequireAuth();
+  const status = useAccountStatus(ready);
+  const scanOn = !status || isOn((status.settings || {}).feature_scan);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
@@ -273,9 +276,11 @@ export default function MovementPage() {
             </button>
           )}
         </div>
-        <button className="icon-btn big" onClick={() => setScan(true)} aria-label={t("scan")}>
-          <Icon name="scan" size={28} />
-        </button>
+        {scanOn && (
+          <button className="icon-btn big" onClick={() => setScan(true)} aria-label={t("scan")}>
+            <Icon name="scan" size={28} />
+          </button>
+        )}
       </div>
       {error && <div className="error">{error}</div>}
       {loading ? (

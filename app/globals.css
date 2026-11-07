@@ -351,3 +351,57 @@ img { max-width: 100%; }
 .quick-n::placeholder { color: #d1a3a3; }
 .quick-n:focus { outline: none; border-color: var(--red); }
 .quick-n.bad { border-color: var(--red); background: #fdeaea; }
+
+/* ---------- Abonnement ---------- */
+.paywall { text-align: center; padding-top: 10px; }
+.paywall h2 { font-size: 26px; margin: 10px 0 6px; }
+.paywall-icon { width: 104px; height: 104px; border-radius: 50%; background: #fdeaea; color: var(--red); margin: 0 auto; display: flex; align-items: center; justify-content: center; }
+.paywall-safe { color: var(--muted); margin: 0 0 14px; }
+.pay { text-align: start; }
+.pay-price { text-align: center; background: #fff; border: 2px solid var(--border); border-radius: 18px; padding: 14px; margin: 6px 0 4px; }
+.pay-price b { font-size: 34px; color: var(--teal); }
+.pay-price span { color: var(--muted); font-weight: 700; }
+.pay-step { font-size: 19px; margin: 20px 0 10px; }
+.pay-ops { display: grid; gap: 10px; }
+.pay-op { background: #fff; border: 3px solid; border-radius: 16px; padding: 10px 12px; display: flex; align-items: center; gap: 12px; }
+.pay-op-name { color: #fff; font-weight: 800; border-radius: 10px; padding: 6px 10px; font-size: 15px; flex: none; }
+.pay-op-num { font-size: 24px; font-weight: 800; color: var(--text); }
+.pay-op-soon { color: var(--muted); font-weight: 600; }
+.pay-me { background: #fff; border: 2px dashed var(--teal); border-radius: 16px; padding: 12px; text-align: center; margin-bottom: 12px; }
+.pay-me small { display: block; color: var(--muted); font-weight: 600; }
+.pay-me b { font-size: 28px; letter-spacing: 1px; }
+.reminder { display: flex; align-items: center; gap: 10px; background: #fff7e0; color: #7a4b00; border-radius: 14px; padding: 10px 12px; margin-bottom: 12px; font-weight: 700; }
+.reminder span:nth-child(2) { flex: 1; }
+.reminder.urgent { background: #fdeaea; color: #991b1b; }
+.reminder-pay { background: var(--green); color: #fff; border-radius: 10px; padding: 6px 12px; }
+.announce { margin-top: 0; }
+.sub-card { display: flex; gap: 12px; align-items: center; background: #e3f6ea; color: #14532d; border-radius: 16px; padding: 14px; margin-bottom: 8px; }
+.sub-card.off { background: #fdeaea; color: #991b1b; }
+
+/* ---------- Administration ---------- */
+.chip { display: inline-flex; align-items: center; gap: 6px; }
+.admin-stats { grid-template-columns: repeat(4, 1fr); }
+.admin-stats .sum b { font-size: 22px; }
+.admin-stats .sum.wide { grid-column: 1 / -1; }
+.acc-list { list-style: none; margin: 14px 0 0; padding: 0; }
+.acc { background: #fff; border: 2px solid var(--border); border-radius: 16px; margin-bottom: 10px; overflow: hidden; }
+.acc.open { border-color: var(--teal); }
+.acc-head { width: 100%; display: flex; align-items: center; gap: 10px; padding: 12px; background: transparent; border: none; text-align: start; color: var(--text); font-size: 17px; }
+.acc-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.acc-main b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acc-main span, .acc-main small { color: var(--muted); font-size: 15px; }
+.badge { flex: none; border-radius: 10px; padding: 5px 9px; font-size: 13px; font-weight: 800; }
+.badge.ok { background: #e3f6ea; color: #14532d; }
+.badge.trial { background: #e8f3f1; color: var(--teal); }
+.badge.warn { background: #fff7e0; color: #7a4b00; }
+.badge.off { background: #fdeaea; color: #991b1b; }
+.badge.wait { background: #eef2f1; color: var(--muted); }
+.acc-body { padding: 0 12px 12px; }
+.acc-info { color: var(--muted); font-size: 15px; margin-bottom: 10px; }
+.acc-label { font-weight: 700; margin: 12px 0 6px; }
+.acc-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 8px; }
+.acc-actions .btn { margin-top: 0; padding: 12px 4px; }
+.acc-pay { margin: 0; padding-inline-start: 18px; color: var(--muted); font-size: 15px; }
+.switch-row { display: flex; align-items: center; gap: 12px; background: #fff; border: 2px solid var(--border); border-radius: 14px; padding: 12px; margin-bottom: 10px; font-weight: 600; }
+.switch-row input { width: 26px; height: 26px; flex: none; accent-color: var(--green); }
+textarea.input { font-size: 17px; resize: vertical; }

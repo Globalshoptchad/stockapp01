@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Icon from "../../components/Icons";
@@ -9,6 +9,7 @@ import { clearProductsCache } from "../../lib/products";
 import { useLang } from "../../components/Providers";
 import { supabase } from "../../lib/supabaseClient";
 import { cleanPhone, phoneToEmail, pinToPassword } from "../../lib/helpers";
+import { clearStatus, loadPublicSettings } from "../../lib/account";
 
 export default function SignupPage() {
   const { t } = useLang();
@@ -19,10 +20,17 @@ export default function SignupPage() {
   const [pin2, setPin2] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [closed, setClosed] = useState(false);
+
+  // L'administrateur peut fermer les inscriptions depuis l'espace administration
+  useEffect(() => {
+    loadPublicSettings().then((s) => setClosed(s.signup_open === "false"));
+  }, []);
 
   async function submit(e) {
     e.preventDefault();
     setError("");
+    if (closed) return setError(t("signup_closed"));
     if (cleanPhone(phone).length < 6) return setError(t("invalid_phone"));
     if (!/^\d{4}$/.test(pin)) return setError(t("invalid_pin"));
     if (pin !== pin2) return setError(t("pins_differ"));
@@ -50,6 +58,7 @@ export default function SignupPage() {
       }
     }
     clearProductsCache();
+    clearStatus();
     router.replace("/catalogue");
   }
 
@@ -60,6 +69,7 @@ export default function SignupPage() {
       </div>
       <AppLogo size={150} />
       <form onSubmit={submit}>
+        {closed && <div className="notice">{t("signup_closed")}</div>}
         {error && <div className="error">{error}</div>}
         <div className="field">
           <label>{t("shop_name")}</label>
